@@ -13,7 +13,7 @@ function pd(s) { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number)
 const dm = s => { const d = pd(s); return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'); };
 const dia = s => DIAS[pd(s).getDay()];
 const diaC = s => DIAS_C[pd(s).getDay()];
-const hora = ts => new Date(ts).toLocaleString('pt-BR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+const hora = ts => new Date(ts).toLocaleString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
 
 let toastT;
 function toast(msg, bad) {
