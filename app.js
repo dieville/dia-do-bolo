@@ -78,6 +78,7 @@ async function viewVotar() {
   const [h, pr] = await Promise.all([home(), sb.from('people').select('id,name,pos').order('pos')]);
   if (pr.error) throw pr.error;
   const v = h.vote;
+  const ord = () => v.flavors.sort((a, b) => (a.is_free - b.is_free) || ((a.sort ?? 50) - (b.sort ?? 50)) || a.name.localeCompare(b.name, 'pt-BR'));
   if (!v.is_open) {
     app.innerHTML = `<div class="narrow card"><h1>Votação encerrada</h1><p class="muted">Os sabores de ${dia(v.cake_date)}, ${dm(v.cake_date)}, já foram escolhidos. A próxima votação abre ${esc(hora(v.opens_at))} às 12h.</p><a class="btn" href="#/">Ver resultado</a></div>`;
     return;
@@ -89,7 +90,7 @@ async function viewVotar() {
       <label for="p">Seu nome</label>
       <select id="p"><option value="">Escolha seu nome</option>${pr.data.map(p => `<option value="${p.id}" ${p.id === person ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
       <label>Sabor</label>
-      <div class="opts">${v.flavors.map(f => `<label class="opt ${f.id === flavor ? 'sel' : ''}" style="margin:0"><input type="radio" name="f" value="${f.id}" ${f.id === flavor ? 'checked' : ''}>${esc(f.name)}</label>`).join('')}</div>
+      <div class="opts">${ord().map(f => `<label class="opt ${f.id === flavor ? 'sel' : ''}" style="margin:0"><input type="radio" name="f" value="${f.id}" ${f.id === flavor ? 'checked' : ''}>${esc(f.name)}</label>`).join('')}</div>
       <label for="sg">Não achou o sabor? Sugira</label>
       <div class="inline"><input id="sg" maxlength="60" placeholder="Ex.: Prestígio"><button class="btn sec" id="sgb" type="button">Sugerir</button></div>
       <p style="margin-top:18px"><button class="btn big" id="ok" ${person && flavor ? '' : 'disabled'}>Confirmar voto</button></p>
@@ -102,7 +103,7 @@ async function viewVotar() {
       if (error) return toast(erro(error), true);
       const f = await sb.from('flavors').select('id,name').order('suggested').order('name');
       const novo = (f.data || []).find(x => x.name.toLowerCase() === n.toLowerCase());
-      if (novo && !v.flavors.some(x => x.id === novo.id)) v.flavors.push({ id: novo.id, name: novo.name, votes: 0 });
+      if (novo && !v.flavors.some(x => x.id === novo.id)) v.flavors.push({ id: novo.id, name: novo.name, votes: 0, sort: 50, is_free: false });
       if (novo) flavor = novo.id;
       toast('Sabor adicionado à lista.'); draw();
     };
@@ -150,7 +151,7 @@ async function viewOrganizar() {
   const [pr, hol, fl] = await Promise.all([
     sb.from('people').select('id,name,pos').order('pos'),
     sb.from('holidays').select('day,name,scope').gte('day', new Date().toISOString().slice(0, 10)).order('day'),
-    sb.from('flavors').select('id,name').order('name')]);
+    sb.from('flavors').select('id,name,sort,is_free').order('is_free').order('sort').order('name')]);
   const cur = h.current.id;
   app.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h1>Organizar</h1><button class="btn sec sm" id="out">Sair</button></div>
   <div class="grid">
@@ -164,7 +165,7 @@ async function viewOrganizar() {
         <div class="inline"><input id="hd" type="date"><input id="hn" maxlength="60" placeholder="Nome"></div>
         <p><button class="btn" id="hb">Adicionar feriado</button></p></section>
       <section class="card"><h2>Sabores</h2>
-        <ul class="list">${fl.data.map(f => `<li><span>${esc(f.name)}</span><button class="btn danger sm rm" data-fl="${f.id}">Remover</button></li>`).join('')}</ul></section>
+        <ul class="list">${fl.data.map(f => `<li><span>${esc(f.name)}</span>${f.is_free ? '<span class="chip rm">fixa</span>' : `<button class="btn danger sm rm" data-fl="${f.id}">Remover</button>`}</li>`).join('')}</ul></section>
     </div></div>`;
   const run = async (p, ok) => { const { error } = await p; if (error) return toast(erro(error), true); toast(ok); route(); };
   $('#out').onclick = async () => { await sb.auth.signOut(); route(); };
