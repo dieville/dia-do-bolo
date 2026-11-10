@@ -46,7 +46,7 @@ async function viewHome() {
       <div class="kick">A vez de trazer os dois bolos é de</div>
       <div class="name">${esc(c.name)}</div>
       <div class="when">${dia(c.cake_date)}, ${dm(c.cake_date)} · ${whenText(c)}</div>
-      <p style="margin:16px 0 0">${c.can_confirm ? '<a class="btn" href="#/confirmar">O bolo chegou</a>' : '<a class="btn" href="#/votar">Votar no sabor</a>'}</p>
+      <p style="margin:16px 0 0">${c.can_confirm ? '<a class="btn" href="#/confirmar">O bolo chegou</a>' : '<a class="btn" href="#/votar">Votar nos sabores</a>'}</p>
     </div>
     <div>${CAKE}</div>
   </section>
@@ -54,7 +54,7 @@ async function viewHome() {
   <div class="grid">
     <section class="card">
       <h2>Votação de sabores</h2>
-      <p class="muted" style="margin-top:-6px">${v.is_open ? 'Aberta até ' + esc(hora(v.closes_at)) + ' às 12h. Os 2 mais votados vencem.' : 'Votação encerrada. Os 2 mais votados venceram.'}</p>
+      <p class="muted" style="margin-top:-6px">${v.is_open ? 'Aberta até ' + esc(hora(v.closes_at)) + ' às 12h. Cada pessoa escolhe 2 sabores e os 2 mais votados vencem.' : 'Votação encerrada. Os 2 mais votados venceram.'}</p>
       <div class="fl">${v.flavors.map(f => `<div class="row"><span>${esc(f.name)}</span><b>${f.votes}</b><div class="bar"><i style="width:${Math.round(f.votes / maxV * 100)}%"></i></div></div>`).join('')}</div>
       <p class="muted">${v.total_votes} de ${v.total_people} pessoas votaram.</p>
       ${v.is_open ? '<a class="btn" href="#/votar">Votar agora</a>' : ''}
@@ -75,7 +75,7 @@ async function viewHome() {
 
 /* ---------- Votar ---------- */
 async function viewVotar() {
-  const [h, pr] = await Promise.all([home(), sb.from('people').select('id,name,pos').order('pos')]);
+  const [h, pr] = await Promise.all([home(), sb.from('people').select('id,name,pos').eq('active', true).order('pos')]);
   if (pr.error) throw pr.error;
   const v = h.vote;
   const ord = () => v.flavors.sort((a, b) => (a.is_free - b.is_free) || ((a.sort ?? 50) - (b.sort ?? 50)) || a.name.localeCompare(b.name, 'pt-BR'));
@@ -83,36 +83,44 @@ async function viewVotar() {
     app.innerHTML = `<div class="narrow card"><h1>Votação encerrada</h1><p class="muted">Os sabores de ${dia(v.cake_date)}, ${dm(v.cake_date)}, já foram escolhidos. A próxima votação abre ${esc(hora(v.opens_at))} às 12h.</p><a class="btn" href="#/">Ver resultado</a></div>`;
     return;
   }
-  let person = '', flavor = '';
+  let person = '', picked = [];
   const draw = (msg) => {
-    app.innerHTML = `<div class="narrow card"><h1>Votar no sabor</h1>
-      <p class="muted">Bolo de ${dia(v.cake_date)}, ${dm(v.cake_date)}. Cada pessoa vota uma vez.</p>
+    const full = picked.length >= 2;
+    const nome = pr.data.find(p => p.id === person)?.name;
+    app.innerHTML = `<div class="narrow card"><h1>Votar nos sabores</h1>
+      <p class="muted">Bolo de ${dia(v.cake_date)}, ${dm(v.cake_date)}. Como são dois bolos, cada pessoa escolhe <b>2 sabores diferentes</b>.</p>
+      <div class="note">Vote só por você. Esta votação funciona na confiança, então por favor seja honesto e não vote por outra pessoa.</div>
       <label for="p">Seu nome</label>
       <select id="p"><option value="">Escolha seu nome</option>${pr.data.map(p => `<option value="${p.id}" ${p.id === person ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
-      <label>Sabor</label>
-      <div class="opts">${ord().map(f => `<label class="opt ${f.id === flavor ? 'sel' : ''}" style="margin:0"><input type="radio" name="f" value="${f.id}" ${f.id === flavor ? 'checked' : ''}>${esc(f.name)}</label>`).join('')}</div>
+      <label>Sabores <span class="muted">(${picked.length} de 2)</span></label>
+      <div class="opts">${ord().map(f => { const on = picked.includes(f.id); return `<label class="opt ${on ? 'sel' : ''}" style="margin:0;${!on && full ? 'opacity:.5' : ''}"><input type="checkbox" value="${f.id}" ${on ? 'checked' : ''} ${!on && full ? 'disabled' : ''}>${esc(f.name)}</label>`; }).join('')}</div>
       <label for="sg">Não achou o sabor? Sugira</label>
-      <div class="inline"><input id="sg" maxlength="60" placeholder="Ex.: Prestígio"><button class="btn sec" id="sgb" type="button">Sugerir</button></div>
-      <p style="margin-top:18px"><button class="btn big" id="ok" ${person && flavor ? '' : 'disabled'}>Confirmar voto</button></p>
+      <div class="inline"><input id="sg" maxlength="40" placeholder="Ex.: Prestígio"><button class="btn sec" id="sgb" type="button">Sugerir</button></div>
+      ${nome ? `<p class="muted" style="margin:18px 0 0">Você está votando como <b>${esc(nome)}</b>.</p>` : ''}
+      <p style="margin-top:12px"><button class="btn big" id="ok" ${person && full ? '' : 'disabled'}>Confirmar votos</button></p>
       <div class="err" id="er">${esc(msg || '')}</div></div>`;
     $('#p').onchange = e => { person = e.target.value; draw(); };
-    app.querySelectorAll('input[name=f]').forEach(r => r.onchange = e => { flavor = e.target.value; draw(); });
+    app.querySelectorAll('.opts input').forEach(r => r.onchange = e => {
+      const id = e.target.value;
+      picked = e.target.checked ? (picked.includes(id) || picked.length >= 2 ? picked : [...picked, id]) : picked.filter(x => x !== id);
+      draw();
+    });
     $('#sgb').onclick = async () => {
       const n = $('#sg').value.trim(); if (!n) return;
       const { error } = await sb.rpc('suggest_flavor', { p_name: n });
       if (error) return toast(erro(error), true);
-      const f = await sb.from('flavors').select('id,name').order('suggested').order('name');
+      const f = await sb.from('flavors').select('id,name').order('name');
       const novo = (f.data || []).find(x => x.name.toLowerCase() === n.toLowerCase());
       if (novo && !v.flavors.some(x => x.id === novo.id)) v.flavors.push({ id: novo.id, name: novo.name, votes: 0, sort: 50, is_free: false });
-      if (novo) flavor = novo.id;
+      if (novo && picked.length < 2 && !picked.includes(novo.id)) picked.push(novo.id);
       toast('Sabor adicionado à lista.'); draw();
     };
     $('#ok').onclick = async () => {
       $('#ok').disabled = true;
-      const { error } = await sb.rpc('cast_vote', { p_person_id: person, p_flavor_id: flavor });
+      const { error } = await sb.rpc('cast_votes', { p_person_id: person, p_flavor_ids: picked });
       if (error) { draw(error.message); return; }
-      const nome = pr.data.find(p => p.id === person)?.name, fn = v.flavors.find(f => f.id === flavor)?.name;
-      app.innerHTML = `<div class="narrow ok-box"><h1>Voto registrado</h1><p>${esc(nome)}, seu voto em <b>${esc(fn)}</b> foi contado.</p><a class="btn" href="#/">Ver resultado</a></div>`;
+      const fn = picked.map(id => v.flavors.find(f => f.id === id)?.name);
+      app.innerHTML = `<div class="narrow ok-box"><h1>Votos registrados</h1><p>${esc(nome)}, seus votos em <b>${esc(fn[0])}</b> e <b>${esc(fn[1])}</b> foram contados.</p><a class="btn" href="#/">Ver resultado</a></div>`;
     };
   };
   draw();
@@ -149,16 +157,32 @@ async function viewOrganizar() {
     return;
   }
   const [pr, hol, fl] = await Promise.all([
-    sb.from('people').select('id,name,pos').order('pos'),
+    sb.from('people').select('id,name,pos,active').order('pos'),
     sb.from('holidays').select('day,name,scope').gte('day', new Date().toISOString().slice(0, 10)).order('day'),
     sb.from('flavors').select('id,name,sort,is_free').order('is_free').order('sort').order('name')]);
   const cur = h.current.id;
+  const ativos = pr.data.filter(p => p.active), arq = pr.data.filter(p => !p.active);
   app.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h1>Organizar</h1><button class="btn sec sm" id="out">Sair</button></div>
   <div class="grid">
-    <section class="card"><h2>Fila</h2><ol class="list">${pr.data.map(p => `<li><span class="num">${p.pos}</span><span>${esc(p.name)} ${p.id === cur ? '<span class="chip">da vez</span>' : ''}</span><button class="btn danger sm rm" data-skip="${p.id}">Pular</button></li>`).join('')}</ol>
-      <label for="np">Adicionar pessoa (vai para o fim da fila)</label>
-      <div class="inline"><input id="np" maxlength="60" placeholder="Nome"><button class="btn" id="npb">Adicionar</button></div></section>
+    <section class="card"><h2>Fila</h2><ol class="list">${ativos.map((p, i) => `<li><span class="num">${i + 1}</span><span>${esc(p.name)} ${p.id === cur ? '<span class="chip">da vez</span>' : ''}</span>
+      <span class="rm acts">
+        <button class="btn sec sm" data-up="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="Subir ${esc(p.name)}">↑</button>
+        <button class="btn sec sm" data-down="${p.id}" ${i === ativos.length - 1 ? 'disabled' : ''} aria-label="Descer ${esc(p.name)}">↓</button>
+        <button class="btn sec sm" data-ren="${p.id}" data-name="${esc(p.name)}">Editar</button>
+        <button class="btn danger sm" data-skip="${p.id}">Pular</button>
+        <button class="btn danger sm" data-arq="${p.id}" data-name="${esc(p.name)}">Arquivar</button>
+      </span></li>`).join('')}</ol>
+      <label for="np">Adicionar pessoa</label>
+      <div class="inline"><input id="np" maxlength="60" placeholder="Nome"></div>
+      <label for="na">Posição na fila</label>
+      <select id="na"><option value="">No fim da fila</option>${ativos.map(p => `<option value="${p.id}">Depois de ${esc(p.name)}</option>`).join('')}</select>
+      <p><button class="btn" id="npb">Adicionar</button></p>
+      ${arq.length ? `<h2 style="margin-top:20px">Arquivadas</h2><ul class="list">${arq.map(p => `<li><span>${esc(p.name)}</span><button class="btn sec sm rm" data-res="${p.id}">Voltar para a fila</button></li>`).join('')}</ul>` : ''}
+    </section>
     <div style="display:grid;gap:16px;align-content:start">
+      <section class="card"><h2>Limpar voto</h2><p class="muted" style="margin-top:-6px">Use se alguém votou no nome de outra pessoa. A pessoa poderá votar de novo.</p>
+        <select id="cv"><option value="">Escolha a pessoa</option>${ativos.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+        <p><button class="btn danger" id="cvb">Limpar voto</button></p></section>
       <section class="card"><h2>Feriados locais e extras</h2>
         <ul class="list">${hol.data.map(x => `<li><span><b>${dm(x.day)}</b> ${esc(x.name)}</span><span class="chip">${x.scope === 'local' ? 'local' : 'nacional'}</span><button class="btn danger sm" data-hol="${x.day}">Remover</button></li>`).join('')}</ul>
         <label for="hd">Novo feriado</label>
@@ -168,11 +192,18 @@ async function viewOrganizar() {
         <ul class="list">${fl.data.map(f => `<li><span>${esc(f.name)}</span>${f.is_free ? '<span class="chip rm">fixa</span>' : `<button class="btn danger sm rm" data-fl="${f.id}">Remover</button>`}</li>`).join('')}</ul></section>
     </div></div>`;
   const run = async (p, ok) => { const { error } = await p; if (error) return toast(erro(error), true); toast(ok); route(); };
+  const on = (sel, fn) => app.querySelectorAll(sel).forEach(fn);
   $('#out').onclick = async () => { await sb.auth.signOut(); route(); };
-  app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { if (confirm('Pular esta pessoa? Ela troca de lugar com a próxima e volta na vez seguinte.')) run(sb.rpc('skip_person', { p_person_id: b.dataset.skip }), 'Pessoa pulada.'); });
-  app.querySelectorAll('[data-hol]').forEach(b => b.onclick = () => run(sb.rpc('remove_holiday', { p_day: b.dataset.hol }), 'Feriado removido.'));
-  app.querySelectorAll('[data-fl]').forEach(b => b.onclick = () => run(sb.rpc('remove_flavor', { p_id: b.dataset.fl }), 'Sabor removido.'));
-  $('#npb').onclick = () => { const n = $('#np').value.trim(); if (n) run(sb.rpc('add_person', { p_name: n }), 'Pessoa adicionada.'); };
+  on('[data-up]', b => b.onclick = () => run(sb.rpc('move_person', { p_person_id: b.dataset.up, p_dir: -1 }), 'Fila atualizada.'));
+  on('[data-down]', b => b.onclick = () => run(sb.rpc('move_person', { p_person_id: b.dataset.down, p_dir: 1 }), 'Fila atualizada.'));
+  on('[data-ren]', b => b.onclick = () => { const n = prompt('Novo nome', b.dataset.name); if (n && n.trim() && n.trim() !== b.dataset.name) run(sb.rpc('rename_person', { p_person_id: b.dataset.ren, p_name: n }), 'Nome atualizado.'); });
+  on('[data-skip]', b => b.onclick = () => { if (confirm('Pular esta pessoa? Ela troca de lugar com a próxima e volta na vez seguinte.')) run(sb.rpc('skip_person', { p_person_id: b.dataset.skip }), 'Pessoa pulada.'); });
+  on('[data-arq]', b => b.onclick = () => { if (confirm('Arquivar ' + b.dataset.name + '? Sai da fila e da lista de votos. O histórico é mantido e dá para voltar depois.')) run(sb.rpc('archive_person', { p_person_id: b.dataset.arq }), 'Pessoa arquivada.'); });
+  on('[data-res]', b => b.onclick = () => run(sb.rpc('restore_person', { p_person_id: b.dataset.res }), 'Pessoa de volta no fim da fila.'));
+  on('[data-hol]', b => b.onclick = () => run(sb.rpc('remove_holiday', { p_day: b.dataset.hol }), 'Feriado removido.'));
+  on('[data-fl]', b => b.onclick = () => run(sb.rpc('remove_flavor', { p_id: b.dataset.fl }), 'Sabor removido.'));
+  $('#npb').onclick = () => { const n = $('#np').value.trim(); if (n) run(sb.rpc('add_person', { p_name: n, p_after: $('#na').value || null }), 'Pessoa adicionada.'); };
+  $('#cvb').onclick = () => { const id = $('#cv').value; if (id) run(sb.rpc('clear_vote', { p_person_id: id }), 'Voto removido.'); else toast('Escolha a pessoa.', true); };
   $('#hb').onclick = () => { const d = $('#hd').value, n = $('#hn').value.trim(); if (d && n) run(sb.rpc('add_holiday', { p_day: d, p_name: n }), 'Feriado adicionado.'); else toast('Preencha data e nome.', true); };
 }
 
