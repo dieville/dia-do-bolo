@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dia do Bolo</title>
+<meta name="description" content="De quem é a vez de trazer o bolo na sexta.">
+<meta name="theme-color" content="#1C2B60">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top__in">
+    <a href="#/" class="brand"><img src="favicon.svg" alt="" width="28" height="28"><span>Dia do Bolo</span></a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#/" data-r="home">Início</a>
+      <a href="#/votar" data-r="votar">Votar</a>
+      <a href="#/confirmar" data-r="confirmar">Confirmar chegada</a>
+      <a href="#/organizar" data-r="organizar">Organizar</a>
+    </nav>
+  </div>
+</header>
+<main id="app" class="wrap" aria-live="polite"><p class="muted">Carregando...</p></main>
+<div id="toast" class="toast" role="status"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
