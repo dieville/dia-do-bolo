@@ -65,3 +65,5 @@ label{display:block;font-weight:500;margin:14px 0 6px}
 .note{margin:14px 0 0;padding:12px 14px;border-radius:12px;background:var(--p100);color:var(--navy);font-size:14px}
 .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .list li{flex-wrap:wrap}
+.hero canvas{width:100%;aspect-ratio:128/80;image-rendering:pixelated;image-rendering:crisp-edges;border-radius:12px;display:block}
+.sabores{margin:12px 0 0;color:#DBD9FF;font-size:15px}

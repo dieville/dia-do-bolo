@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { CAKE } from './cake.js';
+import { mountScene } from './anim.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, detectSessionInUrl: true } });
 const app = document.getElementById('app');
@@ -35,20 +36,52 @@ function whenText(c) {
 }
 
 /* ---------- Início ---------- */
+const BTN_VOTE = '<a class="btn" href="#/votar">Votar nos sabores</a>';
+function heroState(h) {
+  const c = h.current, v = h.vote, cel = h.celebrate;
+  const quando = `${dia(c.cake_date)}, ${dm(c.cake_date)}`;
+  if (cel) {
+    const chip = c.moved ? ' <span class="chip warn">feriado</span>' : '';
+    return cel.round_end
+      ? { scene: 'round', opts: { round: h.round }, kick: `Fim da rodada ${cel.round}! Obrigado,`, name: cel.name,
+          when: `A rodada ${h.round} começa com ${esc(c.name)}, ${dm(c.cake_date)}${chip}`, btn: v.is_open ? BTN_VOTE : '',
+          label: 'Bolo grande com vela acesa comemorando a nova rodada' }
+      : { scene: 'party', kick: 'O bolo chegou! Obrigado,', name: cel.name,
+          when: `Próxima vez: ${esc(c.name)}, ${quando}${chip}`, btn: v.is_open ? BTN_VOTE : '',
+          label: 'Colegas comendo os bolos em volta da mesa com confete' };
+  }
+  const base = { kick: 'A vez de trazer os dois bolos é de', name: c.name, when: `${quando} · ${whenText(c)}` };
+  if (c.can_confirm) return { ...base, scene: 'wait', btn: '<a class="btn" href="#/confirmar">O bolo chegou</a>',
+    label: 'Colegas esperam na porta e o motoboy chega com o bolo' };
+  if (v.is_open) {
+    const horas = (new Date(v.closes_at) - Date.now()) / 36e5;
+    if (horas <= 24) return { ...base, scene: 'urgent', btn: BTN_VOTE,
+      when: `Votação fecha ${horas < 12 ? 'hoje' : 'em menos de 24h'}, ${esc(hora(v.closes_at))} às 12h`,
+      label: 'Chef corre com o bolo, tropeça e cai de cara no bolo' };
+    return { ...base, scene: 'vote', btn: BTN_VOTE, label: 'Chef com o bolo apontando para o botão de votar' };
+  }
+  const top = v.flavors.filter(f => f.votes > 0).sort((a, b) => b.votes - a.votes).slice(0, 2).map(f => esc(f.name));
+  return { ...base, scene: 'moto', opts: { day: pd(c.cake_date).getDay() === 4 ? 'QUINTA' : 'SEXTA' },
+    extra: top.length ? `<p class="sabores">Sabores escolhidos: ${top.join(' e ')}</p>` : '',
+    label: 'Motoboy pilotando com os dois bolos na garupa' };
+}
+
 async function viewHome() {
   const h = await home(), c = h.current, v = h.vote;
   const maxV = Math.max(1, ...v.flavors.map(f => f.votes));
   const pct = h.progress.total ? Math.round(h.progress.done / h.progress.total * 100) : 0;
   const feriado = c.moved ? `<div class="banner">Semana de feriado${c.holiday ? ' (' + esc(c.holiday) + ')' : ''}: o bolo passa para ${dia(c.cake_date)}, ${dm(c.cake_date)}.</div>` : '';
+  const hs = heroState(h);
   app.innerHTML = `
   <section class="hero">
     <div>
-      <div class="kick">A vez de trazer os dois bolos é de</div>
-      <div class="name">${esc(c.name)}</div>
-      <div class="when">${dia(c.cake_date)}, ${dm(c.cake_date)} · ${whenText(c)}</div>
-      <p style="margin:16px 0 0">${c.can_confirm ? '<a class="btn" href="#/confirmar">O bolo chegou</a>' : '<a class="btn" href="#/votar">Votar nos sabores</a>'}</p>
+      <div class="kick">${hs.kick}</div>
+      <div class="name">${esc(hs.name)}</div>
+      <div class="when">${hs.when}</div>
+      ${hs.extra || ''}
+      ${hs.btn ? `<p style="margin:16px 0 0">${hs.btn}</p>` : ''}
     </div>
-    <div>${CAKE}</div>
+    <div><canvas id="scene" role="img" aria-label="${esc(hs.label)}"></canvas></div>
   </section>
   ${feriado}
   <div class="grid">
@@ -71,6 +104,7 @@ async function viewHome() {
       ${h.history.length ? `<ul class="list">${h.history.map(p => `<li class="done"><span class="num">${p.pos}</span><span>${esc(p.name)}</span><span class="sub">${p.cake_date ? dm(p.cake_date) : ''}</span></li>`).join('')}</ul>` : '<p class="muted">Ninguém ainda.</p>'}
     </section>
   </div>`;
+  mountScene($('#scene'), hs.scene, hs.opts);
 }
 
 /* ---------- Votar ---------- */
