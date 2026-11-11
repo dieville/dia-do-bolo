@@ -1,7 +1,7 @@
 
 const W = 128, H = 80;
 const C = { W:'#FFFFFF', w:'#DFE1E6', S:'#E9B48A', K:'#050D23', B:'#7A3A0E', G:'#E8A83A', g:'#D98F2B', c:'#FFF1C9', P:'#4F5663',
-  R:'#FF5630', Y:'#90E0EF', M:'#3D59F7', L:'#7A71FF', l:'#DBD9FF', O:'#8B909C', N:'#1C2B60', bg:'#22336B', fl:'#16224D', wd:'#A8581A' };
+  R:'#FF5630', Y:'#90E0EF', M:'#3D59F7', L:'#7A71FF', l:'#DBD9FF', O:'#8B909C', N:'#1C2B60', bg:'#1C2B60', fl:'#16224D', wd:'#A8581A' };
 let X;
 const r = (x, y, w, h, c) => { X.fillStyle = c; X.fillRect(Math.round(x), Math.round(y), w, h); };
 const px = (x, y, c) => r(x, y, 1, 1, c);
@@ -25,9 +25,7 @@ function bubble(x, y, s, col) {
 function chev(x, y, c) { px(x + 2, y, c); px(x + 1, y + 1, c); px(x, y + 2, c); px(x + 1, y + 3, c); px(x + 2, y + 4, c); }
 
 function room() {
-  r(0, 0, W, H, C.bg);
-  for (let i = 0; i < 6; i++) px(10 + i * 22, 10 + (i % 2) * 6, '#2E4290');
-  r(0, 66, W, 14, C.fl); r(0, 66, W, 1, '#33478F');
+  
 }
 
 /* Pessoa virada para a direita. x = canto esquerdo do corpo, y = topo da cabeça. Pés em y+16. */
@@ -132,19 +130,18 @@ const S = {
   },
 
   moto(t, o = {}) {
-    r(0, 0, W, H, C.bg);
     const hs = [20, 30, 16, 26, 34, 18, 28, 22, 30, 14];
     for (let i = 0; i < 10; i++) {
       const bx = ((i * 22 - t * 8) % 220 + 220) % 220 - 30, h = hs[i];
-      r(bx, 66 - h, 18, h, '#1B2A5E');
-      for (let wy = 66 - h + 4; wy < 62; wy += 6) { px(bx + 4, wy, '#3E54A8'); px(bx + 12, wy, (i + wy) % 3 ? '#3E54A8' : C.G); }
+      r(bx, 66 - h, 18, h, '#22336B');
+      for (let wy = 66 - h + 4; wy < 62; wy += 6) { px(bx + 4, wy, '#2E4290'); px(bx + 12, wy, (i + wy) % 3 ? '#2E4290' : '#6B5A2E'); }
     }
     [[10, 0], [26, 70]].forEach(([cy, c0]) => {
       const cx = ((c0 - t * 12) % 170 + 170) % 170 - 24;
-      r(cx, cy, 16, 3, C.l); r(cx + 4, cy - 2, 7, 2, C.l);
+      r(cx, cy, 16, 3, '#33478F'); r(cx + 4, cy - 2, 7, 2, '#33478F');
     });
-    r(0, 66, W, 14, C.fl); r(0, 66, W, 1, '#33478F');
-    for (let i = 0; i < 10; i++) r(((i * 16 - t * 70) % 160 + 160) % 160 - 16, 73, 8, 1, '#3E54A8');
+    
+    for (let i = 0; i < 10; i++) r(((i * 16 - t * 70) % 160 + 160) % 160 - 16, 73, 8, 1, '#2E4290');
     const sx = Math.round(150 - ((t % 7) / 7) * 220);
     const day = o.day || 'SEXTA', bw = textW(day) + 6;
     if (sx > -30 && sx < 150) { r(sx, 44, 1, 22, C.O); r(sx - (bw >> 1), 36, bw, 9, C.G); text(day, sx - (bw >> 1) + 3, 38, C.K); }
@@ -218,9 +215,12 @@ function loop(now) {
   for (const it of live) { if (!it.canvas.isConnected) { live.delete(it); continue; } paint(it, t); }
   if (live.size) requestAnimationFrame(loop); else running = false;
 }
+function fitFloor() { document.querySelectorAll('.hero').forEach(h => { const c = h.querySelector('canvas'); if (c) h.style.setProperty('--floor', (c.clientHeight * 14 / 80) + 'px'); }); }
+addEventListener('resize', fitFloor);
 export function mountScene(canvas, name, opts = {}) {
   if (!canvas || !S[name]) return;
   canvas.width = W; canvas.height = H;
+  fitFloor();
   const it = { canvas, ctx: canvas.getContext('2d'), name, opts };
   if (reduce) { paint(it, 3); return; }
   live.add(it);
