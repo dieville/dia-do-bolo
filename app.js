@@ -1,9 +1,7 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { sb } from './db.js';
 import { CAKE } from './cake.js';
 import { mountScene } from './anim.js';
 
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, detectSessionInUrl: true } });
 const app = document.getElementById('app');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -247,7 +245,7 @@ function loginView() {
     <p><button class="btn big" id="lg">Enviar link de acesso</button></p><div class="err" id="er"></div></div>`;
   $('#lg').onclick = async () => {
     const email = $('#em').value.trim(); if (!email) return;
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname + '#/organizar' } });
     try { localStorage.setItem('goOrg', '1'); } catch (e) {}
     if (error) { $('#er').textContent = erro(error); return; }
     app.innerHTML = `<div class="narrow ok-box"><h1>Link enviado</h1><p>Abra o e-mail e clique no link para entrar.</p></div>`;
@@ -264,10 +262,6 @@ async function route() {
   catch (e) { app.innerHTML = `<div class="narrow card"><h1>Não foi possível carregar</h1><p class="muted">${esc(erro(e))}</p><button class="btn" onclick="location.reload()">Tentar de novo</button></div>`; }
 }
 window.addEventListener('hashchange', route);
-sb.auth.onAuthStateChange((ev) => {
-  if (ev !== 'SIGNED_IN') return;
-  let go = false; try { go = localStorage.getItem('goOrg') === '1'; localStorage.removeItem('goOrg'); } catch (e) {}
-  if (go) { location.hash = '#/organizar'; } else if (location.hash.startsWith('#/organizar')) route();
-});
+try { localStorage.removeItem('goOrg'); } catch (e) {}
 route();
 setInterval(() => { if (!document.hidden && ['', '#/', '#'].includes(location.hash) && !document.activeElement?.closest('input,select')) route(); }, 60000);
